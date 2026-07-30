@@ -164,6 +164,16 @@ def plot_amplitude(amp_pred, amp_target, idx, metrics, filename):
     plt.close(fig)
 
 def plot_amplitude_extended(amp_pred, amp_target, amp_input, idx, metrics):
+    """
+     Plots a comparison between predicted and target amplitude, a difference between input and output,
+     a difference between three neighbouring lines in an output image
+
+    :param amp_pred: predicted amplitude
+    :param amp_target: ground truth amplitude
+    :param amp_input: input amplitude
+    :param idx: index of a frame
+    :param metrics: evaluation metrics
+    """
 
     log_amp_pred = get_db(amp_pred)
     log_amp_target = get_db(amp_target)
@@ -287,6 +297,15 @@ def plot_phase(phase_pred, phase_target, metrics, idx, filename ):
 
 def amplitude_vs_phase_map(amp_target, phase_pred, phase_target, idx):
 
+    """
+    Plots an error map showing phase error in reference to target amplitude
+
+    :param amp_target: ground truth amplitude
+    :param phase_pred: predicted phase
+    :param phase_target: ground truth phase
+    :param idx: index of a frame
+    """
+
     x_amplitude = amp_target.flatten()
     y_absolute_error = phase_mae(phase_pred.flatten(), phase_target.flatten())
 
@@ -306,12 +325,19 @@ def amplitude_vs_phase_map(amp_target, phase_pred, phase_target, idx):
     plt.close(fig)
 
 def amplitude_vs_amplitude_map(amp_target, amplitude_pred, idx):
+    """
+    Plots an error map showing amplitude error in reference to target amplitude
+
+    :param amp_target: ground truth amplitude
+    :param amplitude_pred: predicted phase
+    :param idx: index of a frame
+    """
 
     x_amplitude = amp_target.flatten()
     y_absolute_error = np.abs(amplitude_pred.flatten() - x_amplitude)
     y_relative_error = (y_absolute_error/(x_amplitude + 1e-6))*100
 
-    #zapobiega błędowi przy wartości błędu 0
+    #avoids division by 0
     y_relative_error_safe = y_relative_error + 1e-6
     fig, ax = plt.subplots(figsize=(8, 5))
     hb = ax.hexbin(x_amplitude, y_relative_error_safe, gridsize=100, cmap='viridis', mincnt=1, xscale='log', yscale='log', norm=LogNorm())
@@ -431,7 +457,13 @@ def amplitude_vs_amplitude_plots(amp_target, amplitude_pred, idx, mode):
     plt.close(fig)
 
 def plot_recs(rec_pred, rec_target, rec_input, filename):
-
+    """
+    Plots comparison between b-mode reconstructions
+    :param rec_pred: image reconstructed from predicted data
+    :param rec_target: image reconstructed from ground truth data
+    :param rec_input: image reconstructed from input data
+    :param filename: output filename
+    """
     fig, axes = plt.subplots(1, 3, figsize=(10, 30))
 
     axes[0].imshow(rec_input, cmap='gray', aspect='equal', interpolation='nearest')
@@ -452,6 +484,15 @@ def plot_recs(rec_pred, rec_target, rec_input, filename):
     plt.close()
 
 def plot_recs_extended(rec_pred, rec_target, rec_input, rec_extended, filename):
+    """
+    Plots comparison between b-mode reconstructions, also adds reconstruction from 'stretched' image
+
+    :param rec_pred: image reconstructed from predicted data
+    :param rec_target: image reconstructed from ground truth data
+    :param rec_input: image reconstructed from input data
+    :param rec_extended: image reconstructed from extended data
+    :param filename: output filename
+    """
 
     fig, axes = plt.subplots(1, 4, figsize=(10, 30))
 
@@ -475,7 +516,14 @@ def plot_recs_extended(rec_pred, rec_target, rec_input, rec_extended, filename):
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
 
-def plot_bmode_results(pred_img, target_img, l1_loss_str, idx=1):
+def plot_bmode_results(pred_img, target_img, l1_loss_str):
+    """
+    Plots bmode results from INR reconstruction
+
+    :param pred_img: image reconstructed from predicted data
+    :param target_img: image reconstructed from ground truth data
+    :param l1_loss_str: MAE loss string
+    """
     fig, axes = plt.subplots(1, 3, figsize=(12, 5))
 
     axes[0].imshow(pred_img, cmap='gray', aspect='auto')
@@ -492,19 +540,33 @@ def plot_bmode_results(pred_img, target_img, l1_loss_str, idx=1):
     axes[2].axis('off')
     plt.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
 
-    fig.suptitle(f"B-Mode Inpainting Evaluation | Frame {idx}\nL1 MAE Loss: {l1_loss_str}",
+    fig.suptitle(f"B-Mode Inpainting Evaluation | L1 MAE Loss: {l1_loss_str}",
                  fontsize=12, fontweight='bold')
 
-    plt.savefig(f"INR/bmode_reconstruction_{idx}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"INR/bmode_reconstruction.png", dpi=300, bbox_inches='tight')
     plt.close(fig)
 
 def get_db(frame):
+    """
+    converts an image to decibel scale
+
+    :param frame: image channel to convert
+    :return: converted image
+    """
     mag = np.abs(frame)
     mag_norm = mag / np.max(mag)
     log_data = 20 * np.log10(mag_norm + 1e-5)
     return log_data
 
 def phase_mae(pred_phase, target_phase):
+    """
+    calculates phase MAE taking phase wrapping into account
+
+    :param pred_phase: predicted phase
+    :param target_phase: ground truth phase
+    :return: phase MAE
+    """
+
     diff = pred_phase - target_phase
     diff = (diff + np.pi) % (2 * np.pi) - np.pi
     return np.abs(diff)

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from load_data import load
+from old_load_data import load
 from torch.utils.data import TensorDataset, DataLoader
 from UNet import UNet
 import time

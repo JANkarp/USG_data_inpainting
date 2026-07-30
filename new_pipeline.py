@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from data_loader import USGDataset
+from new_data_loader import USGDataset
 from torch.utils.data import DataLoader
 from UNet import UNet
 import time
@@ -70,7 +70,7 @@ def new_program_loop(param, batch_size, n_features, decimate, angle_param):
             model.train()
             epoch_loss = 0.0
             try:
-                for batch_idx, (batch_X, batch_Y, _) in enumerate(train_loader):
+                for batch_idx, (batch_X, batch_Y) in enumerate(train_loader):
 
                     batch_X = batch_X.to(device)
                     batch_Y = batch_Y.to(device)
@@ -107,7 +107,7 @@ def new_program_loop(param, batch_size, n_features, decimate, angle_param):
             model.eval()
             val_epoch_loss = 0.0
             with torch.no_grad():
-                for batch_X, batch_Y, _ in val_loader:
+                for batch_X, batch_Y in val_loader:
                     batch_X = batch_X.to(device)
                     batch_Y = batch_Y.to(device)
                     val_predictions = model(batch_X)
@@ -152,13 +152,14 @@ def new_program_loop(param, batch_size, n_features, decimate, angle_param):
 
         loss_data = []
         center_freq = 6e6
+        mean = test_dataset.mean
+        std = test_dataset.std
         with torch.no_grad():
             for idx in range(0,len(test_dataset),4):
                 if idx > 100:
                     break
                 print(f"Image {idx+1} is being processed")
-                sample_input, sample_target, max_val = test_dataset[idx]
-                scale = max_val.item()
+                sample_input, sample_target = test_dataset[idx]
 
                 sample_input_b = sample_input.unsqueeze(0).to(device)
                 sample_target_b = sample_target.unsqueeze(0).to(device)
@@ -169,9 +170,9 @@ def new_program_loop(param, batch_size, n_features, decimate, angle_param):
                 target_np = sample_target_b.cpu().numpy()[0]
                 input_np = sample_input_b.cpu().numpy()[0]
 
-                pred_img = pred_np * scale
-                target_img = target_np * scale
-                input_img = input_np * scale
+                pred_img = (pred_np * std) + mean
+                target_img = (target_np * std) + mean
+                input_img = (input_np * std) + mean
 
                 print('computing loss functions')
                 loss_mslae = (criterion(sample_prediction[:, 0], sample_target_b[:, 0]) +
@@ -223,7 +224,7 @@ def new_program_loop(param, batch_size, n_features, decimate, angle_param):
                 print('Plotting amplitude')
                 plot_amplitude_extended(amplitude_pred, amplitude_target, amplitude_input, idx, current_metrics)
                 print('Plotting phase')
-                plot_phase(phase_pred, phase_target, idx, current_metrics, f"New/Phase/phase_{idx}_IQ.png")
+                plot_phase(phase_pred, phase_target, current_metrics, idx, f"New/Phase/phase_{idx}_IQ.png")
                 print('Plotting amplitude vs phase')
                 amplitude_vs_phase_map(amplitude_target, phase_pred, phase_target, idx)
                 print('Plotting amplitude vs amplitude')
@@ -301,4 +302,4 @@ def values_for_reconstruction(frame, param, H, W, head_x, step, decimate = 1):
     return cols, mask_0, mask_1, i_0, i_1, w, t
 
 if __name__ == '__main__':
-    new_program_loop(2, 8, 32, 8, 3)
+    new_program_loop(2, 8, 32, 8, 2)

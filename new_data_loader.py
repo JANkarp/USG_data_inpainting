@@ -22,14 +22,16 @@ class USGDataset(Dataset):
         return len(self.file_paths)
 
     def __getitem__(self, idx):
+        """
+        Normalizes data using mean and std. Creates an input frame
+        :param idx: data loader idx
+        :return: Frame with zeroed columns, normalized ground truth
+        """
         Y = torch.load(self.file_paths[idx])
 
-        max_val = torch.max(torch.abs(Y))
-
-        if max_val > 1e-8:
-            Y = Y / max_val
+        Y = (Y - self.mean) / (self.std + 1e-8)
 
         X = torch.zeros_like(Y)
         X[:, :, ::self.param] = Y[:, :, ::self.param]
 
-        return X, Y, max_val
+        return X, Y

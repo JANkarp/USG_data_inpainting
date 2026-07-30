@@ -333,4 +333,5 @@ class PixelDataset(Dataset):
 
 if __name__ == '__main__':
     #best found params: 2, 8, 3, 512, 20, 80, 15, 5e-4
-    main(param = 2, decimate = 8, hidden_layers = 3, hidden_features = 512, hidden_omega = 20, first_omega = 80, patience = 20, lr = 5e-4)
+    main(param = 2, decimate = 8, hidden_layers = 3, hidden_features = 512, hidden_omega = 20,
+         first_omega = 90, patience = 15, lr = 5e-4)

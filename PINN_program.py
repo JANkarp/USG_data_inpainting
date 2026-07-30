@@ -171,9 +171,20 @@ def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_om
         input_rec = reconstruct_iq(complex_input, decimate, center_freq, values_for_reconstruction)
         plot_recs(pred_rec, target_rec, input_rec, f'PINN/reconstructions/iq_reconstructions_{param}_{hidden_layers}_{hidden_features}_{hidden_omega}_{first_omega}_{patience}_{alpha_p}_{lr}.png')
 
-def get_pde_loss(model, coords, sound_speed=1480.0, center_freq = 6e6):
+def get_pde_loss(model, coords):
+    """
+    Calculates PDE loss used by PINN to improve learning
+
+    :param model: used pytorch model
+    :param coords: coords of the data points
+    :return: MSE of the PDE loss
+    """
+
+    sound_speed = 1480.0
+    center_freq = 6e6
 
     coords = coords.clone().detach().requires_grad_(True)
+
     k0 = 2*np.pi*center_freq/sound_speed
 
     width = 0.04
@@ -186,17 +197,22 @@ def get_pde_loss(model, coords, sound_speed=1480.0, center_freq = 6e6):
 
     p_real, p_imag = p[:, 0:1], p[:, 1:2]
 
+    #calculate gradients for both the real ind imaginary part
     dpr = torch.autograd.grad(p_real, coords, torch.ones_like(p_real), create_graph=True)[0]
     dpi = torch.autograd.grad(p_imag, coords, torch.ones_like(p_imag), create_graph=True)[0]
 
+    # scale the derivatives to fit the physical data size
     dpr_dz, dpr_dx = dpr[:, 0:1] * z_scale, dpr[:, 1:2] * x_scale
+
     dpi_dz, dpi_dx = dpi[:, 0:1] * z_scale, dpi[:, 1:2] * x_scale
 
+    # calculate second degree gradinets
     d2pr_dz2 = torch.autograd.grad(dpr_dz, coords, torch.ones_like(dpr_dz), create_graph=True)[0][:, 0:1] * z_scale
     d2pr_dx2 = torch.autograd.grad(dpr_dx, coords, torch.ones_like(dpr_dx), create_graph=True)[0][:, 1:2] * x_scale
     d2pi_dz2 = torch.autograd.grad(dpi_dz, coords, torch.ones_like(dpi_dz), create_graph=True)[0][:, 0:1] * z_scale
     d2pi_dx2 = torch.autograd.grad(dpi_dx, coords, torch.ones_like(dpi_dx), create_graph=True)[0][:, 1:2] * x_scale
 
+    #calculate Helmholtz wave equation values
     real = (d2pr_dz2 + d2pr_dx2) / (k0 ** 2) + (2.0 / k0) * dpi_dz
     imag = (d2pi_dz2 + d2pi_dx2) / (k0 ** 2) - (2.0 / k0) * dpr_dz
 
@@ -204,4 +220,4 @@ def get_pde_loss(model, coords, sound_speed=1480.0, center_freq = 6e6):
 
 
 if __name__ == '__main__':
-    main(param=2, decimate=8, hidden_layers=3, hidden_features=512, hidden_omega=40, first_omega=60, patience=15, alpha_p = 1e-3, lr=5e-4)
+    main(param=2, decimate=8, hidden_layers=3, hidden_features=512, hidden_omega=20, first_omega=70, patience=15, alpha_p = 1e-3, lr=5e-4)
