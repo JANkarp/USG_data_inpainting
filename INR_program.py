@@ -8,7 +8,8 @@ import torch
 import torch.nn as nn
 from old_pipeline import MSLAELoss
 from new_pipeline import values_for_reconstruction
-from plots import reconstruct_iq, plot_val_error, plot_phase, plot_amplitude, plot_recs, plot_bmode_results, phase_mae
+from plots import reconstruct_iq, plot_val_error, plot_phase, plot_amplitude, plot_recs, plot_bmode_results, phase_mae, \
+    plot_recs_extended
 from scipy.signal import hilbert
 
 def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_omega, patience, lr):
@@ -68,6 +69,7 @@ def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_om
 
     mask = torch.zeros(Y.shape[-2:], dtype=torch.bool)
     mask[:, ::param] = True
+
 
     train_dataset = PixelDataset(Y, mask, data_flag)
     train_loader = DataLoader(train_dataset, batch_size=int(len(train_dataset)/8), shuffle=True)
@@ -158,6 +160,7 @@ def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_om
         model.eval()
         reconstructed_preds = []
         total_val_loss = 0
+
         with torch.no_grad():
             for coords_batch, targets_batch in test_loader:
                 coords_batch = coords_batch.to(device)
@@ -174,20 +177,44 @@ def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_om
 
         H, W = Y.shape[-2], Y.shape[-1]
 
+
         if data_flag == 'r' or data_flag == 'b':
             pred_img = full_pred.reshape(H, W)
         else:
             pred_img = full_pred.reshape(H, W, 2).permute(2, 0, 1)
 
+            W_extended = W * 2
+            Y_extended = torch.zeros((2, H, W_extended), dtype=Y.dtype)
+            Y_extended[:, :, ::2] = Y
+
+            test_dataset_ext = PixelDataset(Y_extended, mask=None, data_flag=data_flag)
+            test_loader_ext = DataLoader(test_dataset_ext, batch_size=int(len(test_dataset_ext) / 8), shuffle=False)
+
+            reconstructed_preds = []
+            with torch.no_grad():
+                for coords_batch, _ in test_loader_ext:
+                    coords_batch = coords_batch.to(device)
+                    preds = model(coords_batch)
+                    reconstructed_preds.append(preds.cpu())
+
+            ext_full_pred = torch.cat(reconstructed_preds, dim=0)
+            ext_pred_img = ext_full_pred.reshape(H, W_extended, 2).permute(2, 0, 1).cpu().numpy()
+
+
+
         pred_img = pred_img.cpu().numpy()
         target_img = Y.cpu().numpy()
+
 
         pred_img = (pred_img * std) + mean
         target_img = (target_img * std) + mean
 
+
+
         input_img = np.zeros_like(target_img)
 
         if data_flag != 'b':
+
             if data_flag == 'r':
                 input_img[:, ::param] = target_img[:, ::param]
                 complex_pred = hilbert(pred_img, axis=0)
@@ -199,6 +226,8 @@ def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_om
                 complex_pred = pred_img[0] + 1j * pred_img[1]
                 complex_target = target_img[0] + 1j * target_img[1]
                 complex_input = input_img[0] + 1j * input_img[1]
+                ext_pred_img = (ext_pred_img * std) + mean
+                complex_ext = ext_pred_img[0] + 1j * ext_pred_img[1]
 
             amplitude_target = np.abs(complex_target)
             phase_target = np.angle(complex_target)
@@ -222,7 +251,13 @@ def main(param, decimate, hidden_layers, hidden_features, hidden_omega, first_om
             target_rec = reconstruct_iq(complex_target, decimate, center_freq, values_for_reconstruction)
             pred_rec = reconstruct_iq(complex_pred, decimate, center_freq, values_for_reconstruction)
             input_rec = reconstruct_iq(complex_input, decimate, center_freq, values_for_reconstruction)
-            plot_recs(pred_rec, target_rec, input_rec, f'INR/reconstructions/iq_reconstructions_{param}_{hidden_layers}_{hidden_features}_{hidden_omega}_{first_omega}_{patience}_{lr}.png')
+
+            if data_flag == 'r':
+                plot_recs(pred_rec, target_rec, input_rec,
+                                   f'INR/reconstructions/iq_reconstructions_{param}_{hidden_layers}_{hidden_features}_{hidden_omega}_{first_omega}_{patience}_{lr}.png')
+            else:
+                ext_rec = reconstruct_iq(complex_ext, decimate, center_freq, values_for_reconstruction, 1 / param)
+                plot_recs_extended(pred_rec, target_rec, input_rec, ext_rec, f'INR/reconstructions/iq_reconstructions_{param}_{hidden_layers}_{hidden_features}_{hidden_omega}_{first_omega}_{patience}_{lr}.png')
         else:
 
             plot_bmode_results(pred_img, target_img, loss_str)
@@ -277,7 +312,9 @@ def get_iq_data(decimate, file_path):
 
         iq_scaled = (iq_data - mean) / (std + 1e-8)
 
+
         Y_tensor = torch.from_numpy(iq_scaled).float()
+
 
         return Y_tensor, mean, std
 
@@ -334,4 +371,4 @@ class PixelDataset(Dataset):
 if __name__ == '__main__':
     #best found params: 2, 8, 3, 512, 20, 80, 15, 5e-4
     main(param = 2, decimate = 8, hidden_layers = 3, hidden_features = 512, hidden_omega = 20,
-         first_omega = 90, patience = 15, lr = 5e-4)
+         first_omega = 100, patience = 20, lr = 5e-4)
