@@ -1,0 +1,29 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# PyTorch models and binary data files
+*.pth
+*.pkl
+*.png
+*.csv
+*.pt
+data_processed_3/
+data_processed_5/
+data_processed_phantom/
+data_processed_phantom_3/
+usg_string_data/
+usg_cyst_data/
+usg_phantom_data/
+usg_data/
+
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
